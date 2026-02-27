@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Sistem input data pembukuan bendahara - Pencatatan transaksi keuangan kas"
+    />
+    <title>Pembukuan Bendahara | Input Data</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>"
+    />
+  </head>
+  <body>
+    <!-- Background Grid -->
+    <div class="bg-grid"></div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-spinner">
+        <div class="loading-spinner__circle"></div>
+        <span class="loading-spinner__text">Menyimpan data...</span>
+      </div>
+    </div>
+
+    <!-- Main App -->
+    <div class="app-container">
+      <!-- Header -->
+      <header class="app-header">
+        <span class="app-header__icon">💰</span>
+        <h1 class="app-header__title">Pembukuan Bendahara</h1>
+        <p class="app-header__subtitle">
+          Sistem Pencatatan Keuangan Kas Misdinar
+        </p>
+      </header>
+
+      <!-- Stats Cards -->
+      <div class="stats-grid">
+        <div class="stat-card stat-card--income">
+          <span class="stat-card__icon">📈</span>
+          <span class="stat-card__label">Total Pemasukan</span>
+          <span class="stat-card__value" id="totalMasuk">Rp0</span>
+        </div>
+        <div class="stat-card stat-card--expense">
+          <span class="stat-card__icon">📉</span>
+          <span class="stat-card__label">Total Pengeluaran</span>
+          <span class="stat-card__value" id="totalKeluar">Rp0</span>
+        </div>
+        <div class="stat-card stat-card--balance">
+          <span class="stat-card__icon">💎</span>
+          <span class="stat-card__label">Saldo Saat Ini</span>
+          <span class="stat-card__value" id="currentSaldo">Rp0</span>
+        </div>
+      </div>
+
+      <!-- Input Form -->
+      <section class="section section--form">
+        <div class="card">
+          <div class="card__header">
+            <span class="card__icon">📝</span>
+            <h2 class="card__title">Input Transaksi Baru</h2>
+          </div>
+          <div class="card__body">
+            <form id="transactionForm" class="form-grid">
+              <!-- Tanggal -->
+              <div class="form-group">
+                <label class="form-label" for="inputTanggal">
+                  <span class="form-label__icon">📅</span> Tanggal
+                </label>
+                <input
+                  type="date"
+                  id="inputTanggal"
+                  class="form-input"
+                  required
+                />
+              </div>
+
+              <!-- Keterangan -->
+              <div class="form-group">
+                <label class="form-label" for="inputKeterangan">
+                  <span class="form-label__icon">📋</span> Keterangan
+                </label>
+                <input
+                  type="text"
+                  id="inputKeterangan"
+                  class="form-input"
+                  placeholder="Contoh: Sumbangan dari Pak Budi"
+                  required
+                />
+              </div>
+
+              <!-- Type Toggle - Masuk / Keluar -->
+              <div class="type-toggle">
+                <button
+                  type="button"
+                  class="type-toggle__btn active--masuk"
+                  id="btnTypeMasuk"
+                  onclick="setTransactionType('masuk')"
+                >
+                  📈 Uang Masuk
+                </button>
+                <button
+                  type="button"
+                  class="type-toggle__btn"
+                  id="btnTypeKeluar"
+                  onclick="setTransactionType('keluar')"
+                >
+                  📉 Uang Keluar
+                </button>
+              </div>
+
+              <!-- Jumlah (Masuk) -->
+              <div class="form-group" id="groupMasuk">
+                <label class="form-label" for="inputMasuk">
+                  <span class="form-label__icon">💵</span> Jumlah Masuk
+                </label>
+                <div class="currency-input-wrapper">
+                  <span class="currency-prefix">Rp</span>
+                  <input
+                    type="text"
+                    id="inputMasuk"
+                    class="form-input"
+                    placeholder="0"
+                    inputmode="numeric"
+                    oninput="formatCurrency(this)"
+                  />
+                </div>
+              </div>
+
+              <!-- Jumlah (Keluar) -->
+              <div class="form-group" id="groupKeluar" style="display: none">
+                <label class="form-label" for="inputKeluar">
+                  <span class="form-label__icon">💸</span> Jumlah Keluar
+                </label>
+                <div class="currency-input-wrapper">
+                  <span class="currency-prefix">Rp</span>
+                  <input
+                    type="text"
+                    id="inputKeluar"
+                    class="form-input"
+                    placeholder="0"
+                    inputmode="numeric"
+                    oninput="formatCurrency(this)"
+                  />
+                </div>
+              </div>
+
+              <!-- Bukti Foto -->
+              <div class="form-group form-group--full">
+                <label class="form-label">
+                  <span class="form-label__icon">📷</span> Bukti Transaksi
+                  (Opsional)
+                </label>
+                <div class="upload-area" id="uploadArea">
+                  <span class="upload-area__icon">📸</span>
+                  <p class="upload-area__text">
+                    <strong>Klik atau seret foto</strong> ke sini
+                  </p>
+                  <p class="upload-area__hint">JPG, PNG, WEBP • Maks 5MB</p>
+                  <input
+                    type="file"
+                    id="inputBukti"
+                    accept="image/*"
+                    onchange="handleFileSelect(this)"
+                  />
+                </div>
+                <div class="image-preview" id="imagePreview">
+                  <img id="previewImg" src="" alt="Preview bukti" />
+                  <button
+                    type="button"
+                    class="image-preview__remove"
+                    onclick="removeImage()"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <!-- Saldo Estimasi -->
+              <div class="saldo-display">
+                <span class="saldo-display__label"
+                  >Estimasi Saldo Setelah Transaksi</span
+                >
+                <div class="saldo-display__value" id="estimatedSaldo">Rp0</div>
+              </div>
+
+              <!-- Submit Button -->
+              <div class="form-group form-group--full">
+                <button
+                  type="submit"
+                  class="btn btn--primary btn--full"
+                  id="submitBtn"
+                >
+                  <span class="btn__spinner"></span>
+                  <span class="btn__text">💾 Simpan Transaksi</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- Transaction History -->
+      <section class="section section--history">
+        <div class="card">
+          <div class="card__header">
+            <span class="card__icon">📊</span>
+            <h2 class="card__title">Riwayat Transaksi</h2>
+          </div>
+          <div class="card__body" style="padding: 0">
+            <div class="table-wrapper">
+              <table class="table" id="historyTable">
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Keterangan</th>
+                    <th>Bukti</th>
+                    <th>Masuk</th>
+                    <th>Keluar</th>
+                    <th>Saldo</th>
+                  </tr>
+                </thead>
+                <tbody id="historyBody">
+                  <!-- Data loaded via JS -->
+                </tbody>
+              </table>
+            </div>
+            <div class="empty-state" id="emptyState">
+              <span class="empty-state__icon">📭</span>
+              <p class="empty-state__text">
+                Belum ada data transaksi. Mulai input data baru!
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="app-footer">
+        <p>Pembukuan Bendahara Misdinar &copy; 2025 &mdash; v1.0.0</p>
+      </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
