@@ -76,6 +76,10 @@ function handleReadData(e, sheetName) {
   const values = dataRange.getValues();
   const displayValues = dataRange.getDisplayValues();
   
+  // BATCH: ambil semua formula kolom C sekaligus (1 API call vs N calls)
+  const buktiRange = sheet.getRange(DATA_START_ROW, 3, numRows, 1);
+  const formulas = buktiRange.getFormulas();
+  
   const data = [];
   let lastSaldo = 0;
   
@@ -86,10 +90,9 @@ function handleReadData(e, sheetName) {
     // Skip empty rows
     if (!row[0] && !row[2] && !row[3] && !row[4]) continue;
     
-    // Extract bukti link from HYPERLINK formula
+    // Extract bukti link from HYPERLINK formula (already batched)
     let buktiLink = '';
-    const cell = sheet.getRange(DATA_START_ROW + i, 3); // Column C = Bukti
-    const formula = cell.getFormula();
+    const formula = formulas[i][0];
     if (formula) {
       const match = formula.match(/HYPERLINK\("([^"]+)"/);
       if (match) buktiLink = match[1];
@@ -201,49 +204,51 @@ function handleUpdateTransaction(e, sheetName) {
   const dateParts = tanggal.split('/');
   const dateObj = new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
   
-  // Get previous saldo (row above)
+  // Get previous saldo (row above) - 1 API call
   let previousSaldo = 0;
   if (row > DATA_START_ROW) {
     previousSaldo = parseFloat(sheet.getRange(row - 1, 7).getValue()) || 0;
   }
   const saldo = previousSaldo + masuk - keluar;
   
-  // Keep existing bukti (column C) — don't overwrite
-  const rowData = [
-    dateObj,                    // B: Tanggal
-    keterangan,                 // D: Keterangan  
-    masuk > 0 ? masuk : '',     // E: Masuk
-    keluar > 0 ? keluar : '',   // F: Keluar
-    saldo                       // G: Saldo
-  ];
-  
-  // Update Tanggal (B)
+  // BATCH: Update tanggal(B), skip bukti(C), keterangan(D), masuk(E), keluar(F), saldo(G)
+  // Write B, D-G in two batch operations (skip C to preserve bukti)
   sheet.getRange(row, 2).setValue(dateObj);
-  // Skip Bukti (C) - preserve existing
-  // Update Keterangan (D)
-  sheet.getRange(row, 4).setValue(keterangan);
-  // Update Masuk (E)
-  sheet.getRange(row, 5).setValue(masuk > 0 ? masuk : '');
-  // Update Keluar (F)
-  sheet.getRange(row, 6).setValue(keluar > 0 ? keluar : '');
-  // Update Saldo (G)
-  sheet.getRange(row, 7).setValue(saldo);
   
-  // Format
+  const dataRange = sheet.getRange(row, 4, 1, 4); // D, E, F, G
+  dataRange.setValues([[
+    keterangan,
+    masuk > 0 ? masuk : '',
+    keluar > 0 ? keluar : '',
+    saldo
+  ]]);
+  dataRange.setNumberFormats([['@', 'Rp#,##0.00', 'Rp#,##0.00', 'Rp#,##0.00']]);
   sheet.getRange(row, 2).setNumberFormat('dd/MM/yyyy');
-  sheet.getRange(row, 5).setNumberFormat('Rp#,##0.00');
-  sheet.getRange(row, 6).setNumberFormat('Rp#,##0.00');
-  sheet.getRange(row, 7).setNumberFormat('Rp#,##0.00');
   
-  // Recalculate saldo for all rows below
+  // BATCH recalculate saldo for all rows below
   const lastRow = sheet.getLastRow();
-  let currentSaldo = saldo;
-  for (let r = row + 1; r <= lastRow; r++) {
-    const rMasuk = parseFloat(sheet.getRange(r, 5).getValue()) || 0;
-    const rKeluar = parseFloat(sheet.getRange(r, 6).getValue()) || 0;
-    currentSaldo = currentSaldo + rMasuk - rKeluar;
-    sheet.getRange(r, 7).setValue(currentSaldo);
-    sheet.getRange(r, 7).setNumberFormat('Rp#,##0.00');
+  if (row < lastRow) {
+    const belowCount = lastRow - row;
+    // 1 batch read: get all masuk(E) & keluar(F) for rows below
+    const belowData = sheet.getRange(row + 1, 5, belowCount, 2).getValues();
+    
+    // Recalculate in-memory
+    const newSaldos = [];
+    let currentSaldo = saldo;
+    for (let i = 0; i < belowData.length; i++) {
+      const rMasuk = parseFloat(belowData[i][0]) || 0;
+      const rKeluar = parseFloat(belowData[i][1]) || 0;
+      currentSaldo = currentSaldo + rMasuk - rKeluar;
+      newSaldos.push([currentSaldo]);
+    }
+    
+    // 1 batch write: set all saldos at once
+    const saldoRange = sheet.getRange(row + 1, 7, belowCount, 1);
+    saldoRange.setValues(newSaldos);
+    
+    // 1 batch format
+    const formats = newSaldos.map(() => ['Rp#,##0.00']);
+    saldoRange.setNumberFormats(formats);
   }
   
   return createResponse(e, {
@@ -251,107 +256,6 @@ function handleUpdateTransaction(e, sheetName) {
     message: 'Data berhasil diupdate!',
     saldo: saldo
   });
-}
-
-/**
- * Handle POST requests - Tambah data transaksi baru
- * Mendukung: JSON body (fetch) dan form-encoded (iframe submit)
- */
-function doPost(e) {
-  try {
-    // Parse payload - bisa dari form (e.parameter.payload) atau body (e.postData.contents)
-    let body;
-    if (e.parameter && e.parameter.payload) {
-      // Form submission via hidden iframe
-      body = JSON.parse(e.parameter.payload);
-    } else if (e.postData && e.postData.contents) {
-      // Direct JSON body
-      body = JSON.parse(e.postData.contents);
-    } else {
-      return createJsonResponse({ success: false, error: 'No data received' });
-    }
-    
-    const ss = getSpreadsheet();
-    const sheet = ss.getSheetByName(SHEET_NAME);
-    
-    // Parse data dari request
-    const tanggal = body.tanggal; // format: DD/MM/YYYY
-    const keterangan = body.keterangan || '';
-    const masuk = body.masuk ? parseFloat(body.masuk) : 0;
-    const keluar = body.keluar ? parseFloat(body.keluar) : 0;
-    
-    // Upload foto jika ada
-    let buktiLink = '';
-    if (body.buktiBase64 && body.buktiFilename) {
-      buktiLink = uploadImageToDrive(body.buktiBase64, body.buktiFilename);
-    }
-    
-    // Hitung saldo
-    const lastRow = sheet.getLastRow();
-    let previousSaldo = 0;
-    
-    if (lastRow >= DATA_START_ROW) {
-      // Column G (7) = Saldo
-      const lastSaldoCell = sheet.getRange(lastRow, 7);
-      const lastSaldoValue = lastSaldoCell.getValue();
-      if (lastSaldoValue) {
-        previousSaldo = parseFloat(lastSaldoValue);
-      }
-    }
-    
-    const saldo = previousSaldo + masuk - keluar;
-    
-    // Append data ke baris berikutnya
-    const newRow = lastRow + 1;
-    
-    // Parse tanggal string DD/MM/YYYY ke Date object
-    const dateParts = tanggal.split('/');
-    const dateObj = new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
-    
-    // Column B (2) = Tanggal
-    sheet.getRange(newRow, 2).setValue(dateObj);
-    sheet.getRange(newRow, 2).setNumberFormat('dd/MM/yyyy');
-    
-    // Column C (3) = Bukti
-    if (buktiLink) {
-      sheet.getRange(newRow, 3).setFormula('=HYPERLINK("' + buktiLink + '","📷 Lihat Bukti")');
-    }
-    
-    // Column D (4) = Keterangan
-    sheet.getRange(newRow, 4).setValue(keterangan);
-    
-    // Column E (5) = Masuk
-    if (masuk > 0) {
-      sheet.getRange(newRow, 5).setValue(masuk);
-      sheet.getRange(newRow, 5).setNumberFormat('Rp#,##0.00');
-    }
-    
-    // Column F (6) = Keluar
-    if (keluar > 0) {
-      sheet.getRange(newRow, 6).setValue(keluar);
-      sheet.getRange(newRow, 6).setNumberFormat('Rp#,##0.00');
-    }
-    
-    // Column G (7) = Saldo
-    sheet.getRange(newRow, 7).setValue(saldo);
-    sheet.getRange(newRow, 7).setNumberFormat('Rp#,##0.00');
-    
-    return createJsonResponse({
-      success: true,
-      message: 'Data berhasil ditambahkan!',
-      data: {
-        tanggal: tanggal,
-        bukti: buktiLink,
-        keterangan: keterangan,
-        masuk: masuk,
-        keluar: keluar,
-        saldo: saldo
-      }
-    });
-    
-  } catch (error) {
-    return createJsonResponse({ success: false, error: error.toString() });
-  }
 }
 
 /**
@@ -411,15 +315,6 @@ function createResponse(e, data) {
   }
   
   // Regular JSON response
-  return ContentService
-    .createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-/**
- * Create JSON response (for POST requests)
- */
-function createJsonResponse(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
