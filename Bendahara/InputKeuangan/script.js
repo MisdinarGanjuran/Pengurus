@@ -221,8 +221,13 @@ function removeImage() {
 }
 
 // ===== Form Submission via JSONP GET =====
+let isSubmitting = false; // Guard against double-submit
+
 form.addEventListener('submit', (e) => {
   e.preventDefault();
+  
+  // Prevent double-submit
+  if (isSubmitting) return;
   
   // Validate Apps Script URL
   if (!CONFIG.APPS_SCRIPT_URL) {
@@ -250,8 +255,13 @@ form.addEventListener('submit', (e) => {
     return;
   }
 
-  // Build URL parameters (same JSONP approach as loadData)
+  // Lock submission
+  isSubmitting = true;
   setLoading(true);
+  
+  // Capture photo data BEFORE resetForm() clears it
+  const photoBase64 = selectedFileBase64;
+  const photoFile = selectedFile;
   
   // === OPTIMISTIC UI: update table/stats immediately ===
   const estimatedSaldoValue = lastSaldo + masuk - keluar;
@@ -284,17 +294,20 @@ form.addEventListener('submit', (e) => {
   });
   
   // Add photo data only if present (skip large files for URL limits)
-  if (selectedFileBase64 && selectedFile && selectedFileBase64.length < 8000) {
-    params.set('buktiBase64', selectedFileBase64);
-    params.set('buktiFilename', selectedFile.name);
+  if (photoBase64 && photoFile && photoBase64.length < 8000) {
+    params.set('buktiBase64', photoBase64);
+    params.set('buktiFilename', photoFile.name);
   }
 
   // Setup JSONP callback
   window[callbackName] = function(result) {
+    // Guard: only handle once
+    if (!window[callbackName]) return;
     delete window[callbackName];
     const scriptEl = document.getElementById(callbackName);
     if (scriptEl) scriptEl.remove();
     
+    isSubmitting = false;
     setLoading(false);
     
     if (result && result.success) {
@@ -318,6 +331,7 @@ form.addEventListener('submit', (e) => {
   script.onerror = function() {
     delete window[callbackName];
     script.remove();
+    isSubmitting = false;
     setLoading(false);
     // Rollback
     transactionData.pop();
