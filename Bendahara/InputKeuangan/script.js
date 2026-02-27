@@ -283,9 +283,11 @@ form.addEventListener('submit', (e) => {
   // === END OPTIMISTIC UI ===
   
   const callbackName = 'submitCallback_' + Date.now();
+  const nonce = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   const params = new URLSearchParams({
     action: 'add',
     callback: callbackName,
+    nonce: nonce,
     sheet: CONFIG.SHEET_NAME,
     tanggal: tanggal,
     keterangan: keterangan,
@@ -410,9 +412,11 @@ function submitEdit(e) {
   renderHistory();
   
   const callbackName = 'updateCallback_' + Date.now();
+  const nonce = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
   const params = new URLSearchParams({
     action: 'update',
     callback: callbackName,
+    nonce: nonce,
     sheet: CONFIG.SHEET_NAME,
     row: rowNum.toString(),
     tanggal: tanggal,

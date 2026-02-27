@@ -42,6 +42,21 @@ function doGet(e) {
     // Allow frontend to specify which sheet to use
     const sheetName = e.parameter.sheet || SHEET_NAME;
     
+    // Deduplication: prevent Google's redirect from executing write actions twice
+    if (action === 'add' || action === 'update') {
+      const nonce = e.parameter.nonce;
+      if (nonce) {
+        const cache = CacheService.getScriptCache();
+        const cacheKey = 'nonce_' + nonce;
+        if (cache.get(cacheKey)) {
+          // Already processed this request — return success without doing anything
+          return createResponse(e, { success: true, message: 'Sudah diproses (deduplicated)', deduplicated: true });
+        }
+        // Mark as processed (cache for 30 seconds)
+        cache.put(cacheKey, 'done', 30);
+      }
+    }
+    
     if (action === 'add') {
       return handleAddTransaction(e, sheetName);
     }
