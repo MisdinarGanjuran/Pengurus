@@ -343,6 +343,98 @@ function resetForm() {
   setTransactionType('masuk');
 }
 
+// ===== Edit/Update Functions =====
+function openEditModal(index) {
+  const entry = transactionData[index];
+  if (!entry) return;
+
+  document.getElementById('editRowIndex').value = index;
+  document.getElementById('editKeterangan').value = entry.keterangan;
+  
+  // Convert DD/MM/YYYY to YYYY-MM-DD for date input
+  const parts = entry.tanggal.split('/');
+  if (parts.length === 3) {
+    document.getElementById('editTanggal').value = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+  }
+  
+  // Set currency values
+  document.getElementById('editMasuk').value = entry.masuk > 0 ? entry.masuk.toLocaleString('id-ID') : '';
+  document.getElementById('editKeluar').value = entry.keluar > 0 ? entry.keluar.toLocaleString('id-ID') : '';
+  
+  document.getElementById('editModal').classList.add('visible');
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('visible');
+}
+
+function submitEdit(e) {
+  e.preventDefault();
+  
+  const index = parseInt(document.getElementById('editRowIndex').value);
+  const tanggalRaw = document.getElementById('editTanggal').value; // YYYY-MM-DD
+  const dateParts = tanggalRaw.split('-');
+  const tanggal = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`; // DD/MM/YYYY
+  const keterangan = document.getElementById('editKeterangan').value.trim();
+  const masuk = parseCurrency(document.getElementById('editMasuk').value);
+  const keluar = parseCurrency(document.getElementById('editKeluar').value);
+  
+  if (!keterangan) {
+    showToast('Keterangan tidak boleh kosong!', 'error');
+    return;
+  }
+  
+  // Spreadsheet row number = index + DATA_START_ROW (7)
+  const rowNum = index + 7;
+  
+  closeEditModal();
+  setLoading(true);
+  showToast('⏳ Mengupdate data...', 'warning');
+  
+  // Optimistic UI update
+  transactionData[index] = { ...transactionData[index], tanggal, keterangan, masuk, keluar };
+  renderHistory();
+  
+  const callbackName = 'updateCallback_' + Date.now();
+  const params = new URLSearchParams({
+    action: 'update',
+    callback: callbackName,
+    sheet: CONFIG.SHEET_NAME,
+    row: rowNum.toString(),
+    tanggal: tanggal,
+    keterangan: keterangan,
+    masuk: masuk.toString(),
+    keluar: keluar.toString()
+  });
+  
+  window[callbackName] = function(result) {
+    delete window[callbackName];
+    const scriptEl = document.getElementById(callbackName);
+    if (scriptEl) scriptEl.remove();
+    setLoading(false);
+    
+    if (result && result.success) {
+      showToast('✅ Data berhasil diupdate!', 'success');
+      setTimeout(() => loadData(), 1000);
+    } else {
+      showToast('❌ Gagal update: ' + (result?.error || 'Unknown error'), 'error');
+      loadData(); // Reload to restore original
+    }
+  };
+  
+  const script = document.createElement('script');
+  script.id = callbackName;
+  script.src = CONFIG.APPS_SCRIPT_URL + '?' + params.toString();
+  script.onerror = function() {
+    delete window[callbackName];
+    script.remove();
+    setLoading(false);
+    showToast('❌ Gagal mengirim update.', 'error');
+    loadData();
+  };
+  document.body.appendChild(script);
+}
+
 // ===== Load Data from Spreadsheet via Google Visualization API =====
 function loadData() {
   if (!CONFIG.SPREADSHEET_ID) {
@@ -468,8 +560,9 @@ function renderHistory() {
 
   emptyState.style.display = 'none';
   
-  // Show newest first
-  const reversed = [...transactionData].reverse();
+  // Show newest first (but keep original index for editing)
+  const indexed = transactionData.map((entry, i) => ({ ...entry, _index: i }));
+  const reversed = indexed.reverse();
   
   historyBody.innerHTML = reversed.map(entry => `
     <tr>
@@ -481,6 +574,7 @@ function renderHistory() {
       <td class="col-masuk">${entry.masuk > 0 ? '+' + formatRupiah(entry.masuk) : '—'}</td>
       <td class="col-keluar">${entry.keluar > 0 ? '-' + formatRupiah(entry.keluar) : '—'}</td>
       <td class="col-saldo">${formatRupiah(entry.saldo)}</td>
+      <td><button class="btn--edit" onclick="openEditModal(${entry._index})">✏️ Edit</button></td>
     </tr>
   `).join('');
 }

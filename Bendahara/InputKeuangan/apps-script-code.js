@@ -46,6 +46,10 @@ function doGet(e) {
       return handleAddTransaction(e, sheetName);
     }
     
+    if (action === 'update') {
+      return handleUpdateTransaction(e, sheetName);
+    }
+    
     // Default: baca data
     return handleReadData(e, sheetName);
     
@@ -172,6 +176,79 @@ function handleAddTransaction(e, sheetName) {
   return createResponse(e, {
     success: true,
     message: 'Data berhasil ditambahkan!',
+    saldo: saldo
+  });
+}
+
+/**
+ * Update transaksi yang sudah ada di spreadsheet
+ */
+function handleUpdateTransaction(e, sheetName) {
+  const ss = getSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+  
+  const row = parseInt(e.parameter.row);
+  if (!row || row < DATA_START_ROW) {
+    return createResponse(e, { success: false, error: 'Invalid row number' });
+  }
+  
+  const tanggal = e.parameter.tanggal || '';
+  const keterangan = e.parameter.keterangan || '';
+  const masuk = e.parameter.masuk ? parseFloat(e.parameter.masuk) : 0;
+  const keluar = e.parameter.keluar ? parseFloat(e.parameter.keluar) : 0;
+  
+  // Parse tanggal
+  const dateParts = tanggal.split('/');
+  const dateObj = new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
+  
+  // Get previous saldo (row above)
+  let previousSaldo = 0;
+  if (row > DATA_START_ROW) {
+    previousSaldo = parseFloat(sheet.getRange(row - 1, 7).getValue()) || 0;
+  }
+  const saldo = previousSaldo + masuk - keluar;
+  
+  // Keep existing bukti (column C) — don't overwrite
+  const rowData = [
+    dateObj,                    // B: Tanggal
+    keterangan,                 // D: Keterangan  
+    masuk > 0 ? masuk : '',     // E: Masuk
+    keluar > 0 ? keluar : '',   // F: Keluar
+    saldo                       // G: Saldo
+  ];
+  
+  // Update Tanggal (B)
+  sheet.getRange(row, 2).setValue(dateObj);
+  // Skip Bukti (C) - preserve existing
+  // Update Keterangan (D)
+  sheet.getRange(row, 4).setValue(keterangan);
+  // Update Masuk (E)
+  sheet.getRange(row, 5).setValue(masuk > 0 ? masuk : '');
+  // Update Keluar (F)
+  sheet.getRange(row, 6).setValue(keluar > 0 ? keluar : '');
+  // Update Saldo (G)
+  sheet.getRange(row, 7).setValue(saldo);
+  
+  // Format
+  sheet.getRange(row, 2).setNumberFormat('dd/MM/yyyy');
+  sheet.getRange(row, 5).setNumberFormat('Rp#,##0.00');
+  sheet.getRange(row, 6).setNumberFormat('Rp#,##0.00');
+  sheet.getRange(row, 7).setNumberFormat('Rp#,##0.00');
+  
+  // Recalculate saldo for all rows below
+  const lastRow = sheet.getLastRow();
+  let currentSaldo = saldo;
+  for (let r = row + 1; r <= lastRow; r++) {
+    const rMasuk = parseFloat(sheet.getRange(r, 5).getValue()) || 0;
+    const rKeluar = parseFloat(sheet.getRange(r, 6).getValue()) || 0;
+    currentSaldo = currentSaldo + rMasuk - rKeluar;
+    sheet.getRange(r, 7).setValue(currentSaldo);
+    sheet.getRange(r, 7).setNumberFormat('Rp#,##0.00');
+  }
+  
+  return createResponse(e, {
+    success: true,
+    message: 'Data berhasil diupdate!',
     saldo: saldo
   });
 }

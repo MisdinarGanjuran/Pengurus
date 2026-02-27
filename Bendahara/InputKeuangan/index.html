@@ -229,6 +229,7 @@
                     <th>Masuk</th>
                     <th>Keluar</th>
                     <th>Saldo</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="historyBody">
@@ -245,6 +246,56 @@
           </div>
         </div>
       </section>
+
+      <!-- Edit Modal -->
+      <div class="modal-overlay" id="editModal">
+        <div class="modal">
+          <div class="modal__header">
+            <h3 class="modal__title">✏️ Edit Transaksi</h3>
+            <button class="modal__close" onclick="closeEditModal()">&times;</button>
+          </div>
+          <form id="editForm" class="modal__body" onsubmit="submitEdit(event)">
+            <input type="hidden" id="editRowIndex" />
+            <div class="form-group">
+              <label class="form-label" for="editTanggal">
+                <span class="form-label__icon">📅</span> Tanggal
+              </label>
+              <input type="date" id="editTanggal" class="form-input" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editKeterangan">
+                <span class="form-label__icon">📋</span> Keterangan
+              </label>
+              <input type="text" id="editKeterangan" class="form-input" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editMasuk">
+                <span class="form-label__icon">💵</span> Masuk
+              </label>
+              <div class="currency-input-wrapper">
+                <span class="currency-prefix">Rp</span>
+                <input type="text" id="editMasuk" class="form-input" placeholder="0" inputmode="numeric" oninput="formatCurrency(this)" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="editKeluar">
+                <span class="form-label__icon">💸</span> Keluar
+              </label>
+              <div class="currency-input-wrapper">
+                <span class="currency-prefix">Rp</span>
+                <input type="text" id="editKeluar" class="form-input" placeholder="0" inputmode="numeric" oninput="formatCurrency(this)" />
+              </div>
+            </div>
+            <div class="modal__actions">
+              <button type="button" class="btn btn--secondary" onclick="closeEditModal()">Batal</button>
+              <button type="submit" class="btn btn--primary" id="editSubmitBtn">
+                <span class="btn__spinner"></span>
+                <span class="btn__text">💾 Simpan Perubahan</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <!-- Footer -->
       <footer class="app-footer">

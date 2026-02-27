@@ -849,6 +849,116 @@ body::before {
   font-weight: 500;
 }
 
+/* === Edit Modal === */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+  padding: var(--space-md);
+}
+
+.modal-overlay.visible {
+  display: flex;
+}
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 500px;
+  animation: modalIn 0.3s ease-out;
+  box-shadow: var(--shadow-xl), 0 0 40px rgba(0, 0, 0, 0.4);
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal__title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.modal__close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  padding: 0;
+  line-height: 1;
+}
+
+.modal__close:hover {
+  color: var(--accent-danger);
+}
+
+.modal__body {
+  padding: var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.modal__actions {
+  display: flex;
+  gap: var(--space-md);
+  justify-content: flex-end;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-color);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* === Edit Button === */
+.btn--edit {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  background: rgba(var(--accent-info-rgb, 59, 130, 246), 0.15);
+  color: var(--accent-info);
+  border: 1px solid rgba(var(--accent-info-rgb, 59, 130, 246), 0.3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  transition: var(--transition-fast);
+  white-space: nowrap;
+}
+
+.btn--edit:hover {
+  background: rgba(var(--accent-info-rgb, 59, 130, 246), 0.25);
+  border-color: var(--accent-info);
+  transform: translateY(-1px);
+}
+
+/* === Secondary Button === */
+.btn--secondary {
+  background: var(--bg-glass);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.btn--secondary:hover {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
 /* === Footer === */
 .app-footer {
   text-align: center;
